@@ -5,12 +5,17 @@ use bevy::{
     render::render_resource::{
         AddressMode::*, Extent3d, FilterMode::*, SamplerDescriptor, TextureDimension, TextureFormat,
     },
+    tasks::{
+        AsyncComputeTaskPool,
+        TaskPool,
+    }
 };
 use block::basicblock::BlockMaterial;
 use block::blockregistry::BlockRegistry;
 use block::chunk::Chunk;
 use block::mesh::bake;
 use block_mesh::VoxelVisibility;
+use std::sync::{Arc, Mutex};
 mod debugtext;
 mod player;
 mod position;
@@ -97,6 +102,8 @@ fn setup(
 
     let test_torus = meshes.add(shape::Torus::default().into());
 
+    let async_task_pool = AsyncComputeTaskPool::init(TaskPool::new);
+
     commands
         .spawn((PbrBundle {
             mesh: test_torus,
@@ -132,30 +139,41 @@ fn setup(
     // test chunk
 
     println!("making chunks");
+    let meshes_mut = Arc::new(Mutex::new(meshes));
+    let commands_mut = Arc::new(Mutex::new(commands));
 
-    for x in -10..=10 {
-        for z in -10..=10 {
-            for y in -1..=0 {
-                let chunk = Chunk::generate_chunk(&block_registry, x, y, z);
-                let chunk_meshes = bake(&block_registry, &chunk);
-                for (bid, mesh) in chunk_meshes {
-                    if let Some(mat) = block_registry.material_from_id(&bid) {
-                        commands
-                            .spawn(PbrBundle {
-                                mesh: meshes.add(mesh),
-                                material: mat.clone(),
-                                ..default()
-                            })
-                            .insert(WorldPosition::from_xyz(
-                                (32 * x) as f64,
-                                (32 * y) as f64,
-                                (32 * z) as f64,
-                            ));
-                    }
+    async_task_pool.scope(|s|
+        for x in -10..=10 {
+            for z in -10..=10 {
+                for y in -1..=0 {
+                    let meshes_mut = meshes_mut.clone();
+                    let commands_mut = commands_mut.clone();
+                    let block_registry = &block_registry;
+                    s.spawn(async move {
+                        let chunk = Chunk::generate_chunk(&block_registry, x, y, z);
+                        let chunk_meshes = bake(&block_registry, &chunk);
+                        for (bid, mesh) in chunk_meshes {
+                            if let Some(mat) = block_registry.material_from_id(&bid) {
+                                let mut meshes = meshes_mut.lock().unwrap();
+                                let mut commands = commands_mut.lock().unwrap();
+                                commands.spawn(PbrBundle {
+                                    mesh: meshes.add(mesh),
+                                    material: mat.clone(),
+                                    ..default()
+                                })
+                                .insert(WorldPosition::from_xyz(
+                                    (32 * x) as f64,
+                                    (32 * y) as f64,
+                                    (32 * z) as f64,
+                                ));
+
+                            }
+                        }
+                    });
                 }
             }
         }
-    }
+    );
 }
 
 #[allow(dead_code)]

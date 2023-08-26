@@ -61,12 +61,6 @@ impl PreMesh {
             VertexAttributeValues::Float32x2(self.uvs),
         );
 
-        //todo: in the future we might want to encode all the information onto a single uint32
-        // mesh.insert_attribute(
-        //    VoxelTerrainMesh::ATTRIBUTE_DATA,
-        //    VertexAttributeValues::Uint32(data),
-        // );
-
         mesh.set_indices(Some(Indices::U32(self.indices)));
         return mesh;
     }
@@ -119,15 +113,6 @@ pub fn bake(registry: &BlockRegistry, chunk: &Chunk) -> HashMap<BlockId, Mesh> {
     );
 
     let mut premeshes = HashMap::new();
-    /*
-    let num_indices = buffer.quads.num_quads() * 6;
-    let num_vertices = buffer.quads.num_quads() * 4;
-    let mut indices = Vec::with_capacity(num_indices);
-    let mut positions = Vec::with_capacity(num_vertices);
-    let mut normals = Vec::with_capacity(num_vertices);
-    let mut uvs = Vec::with_capacity(num_vertices);
-    */
-    // let mut data = Vec::with_capacity(num_vertices);
     let scale = 1.0;
 
     //normal face index depends on the quad orientation config
